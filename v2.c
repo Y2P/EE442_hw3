@@ -18,6 +18,8 @@
  
 
 #define STACK_SIZE 4096
+
+int swap_flag = 0;
 int current_context = 0;
 int context_num = 0;
 int prev_context= 0;
@@ -48,9 +50,8 @@ void  INThandler(int sig)
 int HasEmptyPlace(struct ThreadInfo ThreadArr[MAX_THREAD])
 {
 	int i;
-	for (i = 0; i < MAX_THREAD ; i++)
+	for (i = 1; i < MAX_THREAD ; i++)
 	{
-
 		if(ThreadArr[i].state == EMPTY)
 			return i;
 	}
@@ -75,9 +76,8 @@ void func(int n,int tabnum)
 
 	//printf("%d\n",idx );
 	//free(ThreadArr[current_context].context.uc_stack.ss_sp); 
-	ThreadArr[current_context].context.uc_stack.ss_size = 0;
-	printf("idx: %d --> EMPTY\n",current_context );
-	ThreadArr[current_context].state = EMPTY;
+	ThreadArr[idx].context.uc_stack.ss_size = 0;
+	ThreadArr[idx].state = EMPTY;
 	//current_context = 0;
 	raise(SIGALRM);
 	//alarm(1);
@@ -85,10 +85,12 @@ void func(int n,int tabnum)
 	//printf("FINISHED: %d\n", n);
 
 }
+int idx;
+
 void context_swapper(int sig)
 {
 	//printf("Signal hit\n");
-	print_flag = true;
+	swap_flag = 1;
 	int i ; 
 	//printf("%d\n", current_context);
 /*	for (i = 1; i < MAX_THREAD; i++)
@@ -104,14 +106,14 @@ void context_swapper(int sig)
 			break;
 	}
 */	
-	prev_context = current_context;
-//	printf("PREV_context: %d state: %d\n",current_context,ThreadArr[current_context].state);
+/*	prev_context = current_context;
+	printf("PREV_context: %d state: %d\n",current_context,ThreadArr[current_context].state);
 
 	do
 	{
 		//printf("%d/n",(ThreadArr[current_context].context.uc_stack.ss_size));
 		current_context++;			
-		//printf("current_context: %d state: %d\n",current_context,ThreadArr[current_context].state);
+		printf("current_context: %d state: %d\n",current_context,ThreadArr[current_context].state);
 
 		current_context = current_context % MAX_THREAD;
 		//if(current_context == 0)
@@ -125,12 +127,12 @@ void context_swapper(int sig)
 	//if(ThreadArr[current_context].context.uc_stack.ss_size)
 	alarm( 1 ); // before scheduling it to be called.
 
-	getcontext(&ThreadArr[prev_context].context);
-	swapcontext(&ThreadArr[prev_context].context, &ThreadArr[current_context].context);
+*/
+	getcontext(&ThreadArr[idx].context);
+	swapcontext(&ThreadArr[idx].context, &ThreadArr[0].context);
 
-
+	alarm(1);
 }
-int idx;
 //int idx[4] = {1 , 2 , 3, 4};
 int i ;
 
@@ -152,17 +154,14 @@ int main(int argc, char const *argv[])
 	getcontext(&c);
 	ThreadArr[0].context = c;
 	ThreadArr[0].state = READY;
+
 	//ThreadArr = malloc(argc*sizeof(struct ThreadInfo));
 	for (i = 1; i < argc ; i++)
 	{
+		prev_context = idx;
 
-		while((idx = HasEmptyPlace(ThreadArr)) == 0)
-		{
-			printf("Main\n");
-			raise(SIGALRM);
-		}
-		
-		//getcontext(&c);
+		while((idx = HasEmptyPlace(ThreadArr)) == 0);		
+		getcontext(&c);
 		
 		c.uc_link = &ThreadArr[0].context;
 		c.uc_stack.ss_sp = malloc(STACK_SIZE);
@@ -172,12 +171,14 @@ int main(int argc, char const *argv[])
 		//printf("%d\n",current_context );
 		//printf("Main Loop\n");
 		//printf("idx:%d\n", idx[(i-1)%4]);
-		//printf("idx: %d\n",idx );
-		printf("idx: %d --> READY\n",idx );
-
 		ThreadArr[idx].context = c;
 		ThreadArr[idx].state = READY;
+		printf("idx: %d\n",idx );
 
+		while(swap_flag == 0);
+		swap_flag = 0;
+		getcontext(&ThreadArr[prev_context].context);
+		swapcontext(&ThreadArr[prev_context].context, &ThreadArr[idx].context);
 
 		//	printf("%d : %d\n",i%MAX_THREAD,ThreadArr[i%MAX_THREAD].state);
 		//
@@ -188,6 +189,6 @@ int main(int argc, char const *argv[])
 	while(1);
 
 	//free(ThreadArr);
-
+	/* code */
 	return 0;
 }
